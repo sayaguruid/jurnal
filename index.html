@@ -80,7 +80,7 @@
 
             <!-- 3. MONITORING ANAK (HANYA UNTUK DESA & DAERAH) -->
             <div id="monitor-section" class="hidden" style="margin-top: 1.5rem;">
-                <h4 style="margin: 0 0 0.5rem 0; color: var(--text-light); font-size: 0.8rem;">MONITORING SALDO ANAK (JUMLAH SAJA)</h4>
+                <h4 style="margin: 0 0 0.5rem 0; color: var(--text-light); font-size: 0.8rem;">MONITORING SALDO KELOMPOK</h4>
                 <div id="monitor-grid" class="card-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
                     <!-- Diisi otomatis via JS -->
                 </div>
@@ -159,6 +159,11 @@
                         <input type="text" id="tb-nominal" placeholder="0" oninput="formatRupiahInput(this)" onkeyup="formatRupiahInput(this)">
                     </div>
                 </div>
+                <!-- TAMBAHAN KETERANGAN -->
+                <div style="margin-bottom:1rem;">
+                    <label>Keterangan</label>
+                    <input type="text" id="tb-ket" placeholder="Catatan...">
+                </div>
                 <button class="btn btn-primary" onclick="simpanTabungan()"><i class="ph ph-piggy-bank"></i> Simpan Tabungan</button>
             </div>
             <div class="table-container">
@@ -167,7 +172,8 @@
                     <button class="btn btn-sm btn-primary" onclick="downloadExcel('laporan-tabungan')"><i class="ph ph-download-simple"></i> Laporan Tabungan</button>
                 </div>
                 <table>
-                    <thead><tr><th>Tgl</th><th>Tipe</th><th>Jenis Tabungan</th><th style="text-align:right">Nominal</th><th>Aksi</th></tr></thead>
+                    <!-- UPDATE HEADER TABLE -->
+                    <thead><tr><th>Tgl</th><th>Tipe</th><th>Jenis Tabungan</th><th>Keterangan</th><th style="text-align:right">Nominal</th><th>Aksi</th></tr></thead>
                     <tbody id="tbody-tabungan"></tbody>
                 </table>
             </div>
