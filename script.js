@@ -1,6 +1,92 @@
+// --- CONFIG & GLOBALS ---
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGSOsV1HazZ-_4krq_ewUdfVLVYYLTU9kdkzX-rAzpNGGyr-RPhSU2YKtqzHJeUeJK/exec'; 
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 Menit ( dalam milidetik )
+const STORAGE_KEY_USER = 'jurnalku_user';
+const STORAGE_KEY_TIME = 'jurnalku_last_activity';
+
 let user = null;
 let db = { kategori: [], transaksi: [], tabungan: [], summary_balances: [] };
+let sessionTimer;
+
+// --- SESSION MANAGEMENT ---
+
+// Cek sesi saat halaman dimuat
+window.onload = function() {
+    checkSession();
+    // Pasang listener untuk aktivitas user (mouse, keyboard, klik)
+    // agar tidak logout saat sedang bekerja
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('keypress', resetTimer);
+    window.addEventListener('click', resetTimer);
+};
+
+function checkSession() {
+    const storedUser = localStorage.getItem(STORAGE_KEY_USER);
+    const storedTime = localStorage.getItem(STORAGE_KEY_TIME);
+    const now = Date.now();
+
+    if (storedUser && storedTime) {
+        // Cek apakah waktu habis
+        if (now - parseInt(storedTime) > SESSION_TIMEOUT) {
+            doLogout(true); // Logout pakai karena timeout
+        } else {
+            // Masih login, restore data
+            user = JSON.parse(storedUser);
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-view').style.display = 'block';
+            initAppAfterLogin();
+            resetTimer(); // Mulai timer ulang
+        }
+    } else {
+        // Belum ada sesi, tampilkan login
+        document.getElementById('login-view').classList.remove('hidden');
+        document.getElementById('app-view').style.display = 'none';
+    }
+}
+
+function saveSession() {
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEY_TIME, Date.now().toString());
+}
+
+function clearSession() {
+    localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_KEY_TIME);
+    user = null;
+}
+
+function resetTimer() {
+    // Jika user belum login, jangan update timer
+    if (!user) return;
+    
+    localStorage.setItem(STORAGE_KEY_TIME, Date.now().toString());
+}
+
+// Fungsi Logout Manual (Tombol Keluar)
+function doLogout() {
+    if(confirm('Apakah Anda yakin ingin keluar?')) {
+        performLogout();
+    }
+}
+
+// Fungsi Logout Otomatis (Timeout)
+function doLogout(isTimeout = false) {
+    if (isTimeout) {
+        showToast("Sesi Anda telah berakhir. Silakan login kembali.", "error");
+    }
+    performLogout();
+}
+
+function performLogout() {
+    clearSession();
+    document.getElementById('app-view').style.display = 'none';
+    document.getElementById('login-view').classList.remove('hidden');
+    document.getElementById('login-pass').value = '';
+    document.getElementById('btn-login').innerText = 'MASUK';
+    document.getElementById('login-msg').innerText = '';
+}
+
+// --- LOGIC APLIKASI ---
 
 // Helpers
 const formatRp = (num) => "Rp " + Number(num).toLocaleString('id-ID');
@@ -34,6 +120,23 @@ function getUserAkun() {
     return '';
 }
 
+// Inisialisasi setelah login sukses
+function initAppAfterLogin() {
+    const namaAkun = getUserAkun();
+    document.getElementById('header-detail').innerText = `Kelompok: ${user.kelompok || '-'}`;
+    document.getElementById('my-akun-display').innerText = namaAkun;
+
+    if(user.role === 'Desa' || user.role === 'Daerah') {
+        document.getElementById('monitor-section').classList.remove('hidden');
+    } else {
+        document.getElementById('monitor-section').classList.add('hidden');
+    }
+
+    showToast(`Selamat Datang, ${user.nama_admin}`);
+    initMonthFilter();
+    loadData();
+}
+
 // --- LOGIN ---
 function doLogin() {
     const pass = document.getElementById('login-pass').value;
@@ -50,20 +153,14 @@ function doLogin() {
     .then(r=>r.json()).then(res => {
         if(res.status==='success'){
             user = res.user;
+            
+            // Simpan sesi
+            saveSession();
+
             document.getElementById('login-view').classList.add('hidden');
             document.getElementById('app-view').style.display = 'block';
-            const namaAkun = getUserAkun();
-            document.getElementById('header-detail').innerText = `Kelompok: ${user.kelompok || '-'}`;
-            document.getElementById('my-akun-display').innerText = namaAkun;
-
-            // Tampilkan Monitoring hanya untuk Desa dan Daerah
-            if(user.role === 'Desa' || user.role === 'Daerah') {
-                document.getElementById('monitor-section').classList.remove('hidden');
-            }
-
-            showToast(`Selamat Datang, ${user.nama_admin}`);
-            initMonthFilter();
-            loadData();
+            
+            initAppAfterLogin();
         } else {
             msg.innerText = "Login Gagal: " + (res.message || "Password Salah");
             msg.style.color = "var(--danger)";
