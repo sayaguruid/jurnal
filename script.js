@@ -353,6 +353,7 @@ function simpanTabungan() {
         tipe: document.getElementById('tb-tipe').value,
         kategori_id: document.getElementById('tb-kategori').value,
         nominal: parseRupiah(document.getElementById('tb-nominal').value),
+        keterangan: document.getElementById('tb-ket').value, // TAMBAHAN KETERANGAN
         nama_admin: user.nama_admin,
         desa: user.desa,
         kelompok: user.kelompok
@@ -360,7 +361,14 @@ function simpanTabungan() {
     if(!payload.kategori_id || !payload.nominal) return alert("Lengkapi data");
 
     fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify(payload) })
-    .then(r=>r.json()).then(res => { if(res.status==='success') { showToast('Tabungan Disimpan'); document.getElementById('tb-nominal').value=''; loadData(); }});
+    .then(r=>r.json()).then(res => { 
+        if(res.status==='success') { 
+            showToast('Tabungan Disimpan'); 
+            document.getElementById('tb-nominal').value=''; 
+            document.getElementById('tb-ket').value=''; // RESET KETERANGAN
+            loadData(); 
+        }
+    });
 }
 
 function renderTabunganTable() {
@@ -370,10 +378,12 @@ function renderTabunganTable() {
     data.forEach(t => {
         const isMasuk = t.tipe === 'masuk';
         const kat = getMyCategories().find(k => k.id === t.kategori_id);
+        // UPDATE TABEL UNTUK MENAMPILKAN KETERANGAN
         tbody.innerHTML += `<tr>
             <td>${t.tanggal}</td>
             <td><span class="badge ${isMasuk?'badge-kas':'badge-keluar'}" style="${!isMasuk?'background:#fee2e2;color:#991b1b':''}">${isMasuk?'Setor':'Tarik'}</span></td>
             <td><span class="badge badge-tab">${kat ? kat.nama_kategori : '-'}</span></td>
+            <td>${t.keterangan || '-'}</td>
             <td style="text-align:right; font-weight:bold; color:${isMasuk?'var(--success)':'var(--danger)'}">${formatRp(t.nominal)}</td>
             <td><button class="btn btn-sm btn-danger" onclick="hapusTrans('${t.id}')"><i class="ph ph-trash"></i></button></td>
         </tr>`;
@@ -691,6 +701,7 @@ async function downloadExcel(tipe) {
         styleTitle(1, 'E', 'LAPORAN TABUNGAN');
         styleSubTitle(2, 'E', `Kelompok : ${namaAkun} | Periode : ${filterVal}`);
 
+        // UPDATE HEADER EXCEL MENJADI 5 KOLOM (Tambah Keterangan)
         ws.addRow(['TANGGAL','KETERANGAN','MASUK (+)','KELUAR (-)','SALDO']);
         const hr = ws.getRow(3);
 
@@ -709,6 +720,7 @@ async function downloadExcel(tipe) {
             r++;
             const n = Number(t.nominal);
             const kat = getMyCategories().find(k => k.id === t.kategori_id);
+            // Gunakan keterangan dari input, jika kosong gunakan nama kategori
             const ket = t.keterangan || (kat ? kat.nama_kategori : '-');
 
             saldo = t.tipe === 'masuk' ? saldo + n : saldo - n;
