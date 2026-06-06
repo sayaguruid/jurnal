@@ -45,11 +45,16 @@
         <!-- DASHBOARD WRAPPER -->
         <div class="dashboard-wrapper">
             <!-- 1. KARTU UTAMA (TOTAL BERJALAN) -->
-            <h4 style="margin: 0 0 0.5rem 0; color: var(--text-light); font-size: 0.8rem;">TOTAL KAS (KUMULATIF)</h4>
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--text-light); font-size: 0.8rem;">TOTAL KAS & TABUNGAN (KUMULATIF)</h4>
             <div class="card-grid">
                 <div class="card saldo main">
                     <div class="card-label">Saldo Kas</div>
                     <div class="card-value" id="val-saldo-main">Rp 0</div>
+                </div>
+                <!-- TAMBAHAN KARTU SALDO TABUNGAN -->
+                <div class="card saldo main" style="border-color: #f59e0b;">
+                    <div class="card-label">Saldo Tabungan</div>
+                    <div class="card-value" id="val-saldo-tabungan" style="color: #d97706;">Rp 0</div>
                 </div>
                 <div class="card masuk main">
                     <div class="card-label">Pemasukan</div>
@@ -60,6 +65,7 @@
                     <div class="card-value" style="color: var(--danger);" id="val-keluar-main">Rp 0</div>
                 </div>
             </div>
+
 
             <!-- 2. KARTU PERIODE (KECIL) -->
             <h4 style="margin: 1.5rem 0 0.5rem 0; color: var(--text-light); font-size: 0.8rem;">DATA PERIODE (<span id="lbl-periode">-</span>)</h4>
