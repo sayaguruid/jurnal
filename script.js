@@ -249,7 +249,7 @@ function renderDashboard() {
     const filterVal = document.getElementById('filter-bulan').value;
     document.getElementById('lbl-periode').innerText = filterVal === 'all' ? 'Semua' : filterVal;
 
-    // 1. Hitung Data Utama (Total Berjalan - Data dari DB Sudah Filter Server Side)
+    // 1. Hitung Data Utama (Total Berjalan)
     let sMasukMain=0, sKeluarMain=0;
     db.transaksi.forEach(t => {
         const nom = parseFloat(t.nominal);
@@ -257,7 +257,16 @@ function renderDashboard() {
         else sKeluarMain += nom;
     });
 
+    // --- TAMBAHAN: Hitung Saldo Tabungan Total ---
+    let sMasukTabungan=0, sKeluarTabungan=0;
+    db.tabungan.forEach(t => {
+        const nom = parseFloat(t.nominal);
+        if (t.tipe === 'masuk') sMasukTabungan += nom;
+        else sKeluarTabungan += nom;
+    });
+
     document.getElementById('val-saldo-main').innerText = formatRp(sMasukMain - sKeluarMain);
+    document.getElementById('val-saldo-tabungan').innerText = formatRp(sMasukTabungan - sKeluarTabungan); // Update kartu tabungan
     document.getElementById('val-masuk-main').innerText = formatRp(sMasukMain);
     document.getElementById('val-keluar-main').innerText = formatRp(sKeluarMain);
 
@@ -277,7 +286,6 @@ function renderDashboard() {
     document.getElementById('val-masuk-per').innerText = formatRp(sMasukPer);
     document.getElementById('val-keluar-per').innerText = formatRp(sKeluarPer);
 }
-
 function renderDropdowns() {
     const myCats = getMyCategories();
     const selKas = document.getElementById('tr-kategori');
@@ -695,55 +703,93 @@ async function downloadExcel(tipe) {
     }
 
     // =====================================================
-    // ================= TABUNGAN ==========================
+    // ================= TABUNGAN (PER KATEGORI) ============
     // =====================================================
     else if (tipe === 'laporan-tabungan') {
-        styleTitle(1, 'E', 'LAPORAN TABUNGAN');
-        styleSubTitle(2, 'E', `Kelompok : ${namaAkun} | Periode : ${filterVal}`);
+        styleTitle(1, 'E', 'LAPORAN TABUNGAN PER KATEGORI');
+        styleSubTitle(2, 'E', `Kelompok : ${namaAkun} | Periode : ${filterVal === 'all' ? 'Semua' : filterVal}`);
 
-        // UPDATE HEADER EXCEL MENJADI 5 KOLOM (Tambah Keterangan)
-        ws.addRow(['TANGGAL','KETERANGAN','MASUK (+)','KELUAR (-)','SALDO']);
-        const hr = ws.getRow(3);
-
-        for (let c=1;c<=5;c++) {
-            const cell = hr.getCell(c);
-            cell.font = { bold:true, color:{argb:'FFFFFFFF'} };
-            cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF7C3AED'} };
-            cell.alignment = { horizontal:'center' };
-            cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
-        }
-
-        let saldo = 0;
-        let r = 3;
-
+        // 1. Kelompokkan Data berdasarkan Kategori
+        const groupedData = {};
         db.tabungan.forEach(t => {
-            r++;
-            const n = Number(t.nominal);
-            const kat = getMyCategories().find(k => k.id === t.kategori_id);
-            // Gunakan keterangan dari input, jika kosong gunakan nama kategori
-            const ket = t.keterangan || (kat ? kat.nama_kategori : '-');
+            const catId = t.kategori_id;
+            if (!groupedData[catId]) groupedData[catId] = [];
+            groupedData[catId].push(t);
+        });
 
-            saldo = t.tipe === 'masuk' ? saldo + n : saldo - n;
+        let currentRow = 4; // Mulai menulis data dari baris ke-4
 
-            ws.addRow([
-                t.tanggal,
-                ket,
-                t.tipe === 'masuk' ? n : '',
-                t.tipe === 'keluar' ? n : '',
-                saldo
-            ]);
+        // 2. Loop setiap kategori dan buat tabelnya
+        Object.keys(groupedData).forEach(catId => {
+            const kategori = getMyCategories().find(k => k.id === catId);
+            const namaKategori = kategori ? kategori.nama_kategori : 'Tanpa Kategori';
+            const transaksi = groupedData[catId].sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal));
 
-            ws.getCell(`C${r}`).numFmt = '"Rp "#,##0';
-            ws.getCell(`D${r}`).numFmt = '"Rp "#,##0';
-            ws.getCell(`E${r}`).numFmt = '"Rp "#,##0';
-            styleBorder(r,1,5);
+            // --- Header Kategori ---
+            ws.addRow([`KATEGORI: ${namaKategori}`]);
+            const headerRow = ws.getRow(currentRow);
+            headerRow.font = { bold: true, size: 12, color: { argb:'FF7C3AED' } };
+            headerRow.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF3E8FF'} };
+            ws.mergeCells(`A${currentRow}:E${currentRow}`);
+            currentRow++;
+
+            // --- Header Tabel ---
+            ws.addRow(['TANGGAL','KETERANGAN','MASUK (+)','KELUAR (-)','SALDO']);
+            const tableHeader = ws.getRow(currentRow);
+            for (let c=1;c<=5;c++) {
+                const cell = tableHeader.getCell(c);
+                cell.font = { bold:true, color:{argb:'FFFFFFFF'} };
+                cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF7C3AED'} };
+                cell.alignment = { horizontal:'center' };
+                cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+            }
+            currentRow++;
+
+            // --- Isi Data Transaksi ---
+            let saldoKategori = 0;
+            transaksi.forEach(t => {
+                const n = Number(t.nominal);
+                const ket = t.keterangan || (kategori ? kategori.nama_kategori : '-');
+                saldoKategori = t.tipe === 'masuk' ? saldoKategori + n : saldoKategori - n;
+
+                ws.addRow([
+                    t.tanggal,
+                    ket,
+                    t.tipe === 'masuk' ? n : '',
+                    t.tipe === 'keluar' ? n : '',
+                    saldoKategori
+                ]);
+
+                const dataRow = ws.getRow(currentRow);
+                ws.getCell(`C${currentRow}`).numFmt = '"Rp "#,##0';
+                ws.getCell(`D${currentRow}`).numFmt = '"Rp "#,##0';
+                ws.getCell(`E${currentRow}`).numFmt = '"Rp "#,##0';
+                
+                // Border sel
+                for (let c=1;c<=5;c++) {
+                    dataRow.getCell(c).border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+                }
+                currentRow++;
+            });
+
+            // --- Total Kategori ---
+            ws.addRow(['', 'SALDO AKHIR ' + namaKategori.toUpperCase(), '', '', saldoKategori]);
+            const totalRow = ws.getRow(currentRow);
+            totalRow.font = { bold: true };
+            ws.getCell(`E${currentRow}`).fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD1FAE5'} };
+            ws.getCell(`E${currentRow}`).numFmt = '"Rp "#,##0';
+            ws.getCell(`E${currentRow}`).alignment = { horizontal: 'right' };
+            for (let c=1;c<=5;c++) {
+                totalRow.getCell(c).border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+            }
+            
+            currentRow += 2; // Beri jarak antar kategori
         });
 
         ws.columns = [
-            { width:12 }, { width:30 }, { width:14 }, { width:14 }, { width:18 }
+            { width:12 }, { width:35 }, { width:14 }, { width:14 }, { width:18 }
         ];
     }
-
     // ================= SAVE FILE =================
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
